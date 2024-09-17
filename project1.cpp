@@ -5,151 +5,191 @@
 #include <algorithm>
 #include <deque>
 #include <map>
+#include <cassert>
 using namespace std;
 
 
 class getFastestRoute   {
+    public:
+        getFastestRoute(): useStack(false), rSchemeProvided(false), isMapOutput(true), foundRoute(false){}
 
-    void printHelp()    {
-        //TODO IMPLEMENT
-        return;
-    }
-    
-    void getMode(int argc, char * argv[]) {
-        // These are used with getopt_long()
-        opterr = false; // Let us handle all error output for command line options
-        int choice;
-        int index = 0;
-        option long_options[] = {
-            {"stack", no_argument, nullptr, 's'},
-            {"queue", no_argument, nullptr, 'q'},
-            {"output", required_argument, nullptr, 'o'},
-            {"help", no_argument, nullptr, 'h'},
-            { nullptr, 0, nullptr, '\0' },
-        };  // long_options[]
+        void printHelp()    {
+            //TODO IMPLEMENT
+            return;
+        }
+        
+        void getMode(int argc, char * argv[]) {
+            // These are used with getopt_long()
+            opterr = false; // Let us handle all error output for command line options
+            int choice;
+            int index = 0;
+            option long_options[] = {
+                {"stack", no_argument, nullptr, 's'},
+                {"queue", no_argument, nullptr, 'q'},
+                {"output", required_argument, nullptr, 'o'},
+                {"help", no_argument, nullptr, 'h'},
+                { nullptr, 0, nullptr, '\0' },
+            };  // long_options[]
 
-        // Fill in the double quotes, to match the mode and help options.
-        while ((choice = getopt_long(argc, argv, "sqo:h", long_options, &index)) != -1) {
-            switch (choice) {
-                case 's':
-                    useStack = true;
+            // Check for:
+            //illegal input characters, such as 'f'
+            //for than one '-stack' or '-queue' on command line
+                //i.e. ./ship --queue -s < infile > outfile
+            //no option specified for stack or queue
+            //two options specified for stack and queue
+            //after -o will be correct (no need to check for other characters than O or M in output, or files to output to)
+            int counter = 0;
+            rSchemeProvided = false;
 
-                case 'q': 
-                    useStack = false;
+            while ((choice = getopt_long(argc, argv, "sqo:h", long_options, &index)) != -1) {
+                switch (choice) {
+                    case 's':
+                        useStack = true;
+                        rSchemeProvided = true;
+                        if (counter > 0)    {
+                            cerr << "Multiple routing modes specified" << endl;
+                            exit(1);
+                        }
+                        ++counter;
+                        break;
+                    case 'q': 
+                        useStack = false;
+                        rSchemeProvided = true;
+                        if (counter > 0)    {
+                            cerr << "Multiple routing modes specified" << endl;
+                            exit(1);
+                        }
+                        ++counter;
+                        break;
+                    case 'o':   {
+                        if (!optarg)  {
+                            isMapOutput = true;
+                            break;
+                        }
+                        char arg = *optarg;
 
-                case 'o':   {
-                    string arg{optarg};
-
-                    if (arg != "M" && arg != "L") {
-                        //TODO CHECK IF Exit SHOULD BE USED
-                        // The first line of error output has to be a 'fixed' message
-                        // for the autograder to show it to you.
-                        cerr << "Error: invalid mode" << endl;
-                        // The second line can provide more information, but you
-                        // won't see it on the AG.
-                        cerr << "  I don't recognize: " << arg << endl;
+                        if (arg != 'M' && arg != 'L') {
+                            // The first line of error output has to be a 'fixed' message
+                            // for the autograder to show it to you.
+                            cerr << "Invalid output mode specified" << endl;
+                            exit(1);
+                        }  // if ..arg valid
+                        
+                        if (arg == 'L') { // Maybe use ''
+                            isMapOutput = false;
+                            break;
+                        }
+                        else    {
+                            isMapOutput = true;
+                            break;
+                        }
+                    }
+                    case 'h':
+                        printHelp();
+                        exit(0);
+                    default:
+                        cerr << "Error: invalid option" << endl;
                         exit(1);
-                    }  // if ..arg valid
-                    
-                    if (arg == "L") { // Maybe use ''
-                        isMapOutput = false;
-                    }
-                    else    {
-                        isMapOutput = true;
-                    }
-                }
-                case 'h':
-                    printHelp();
-                    exit(0);
-                default:
-                    cerr << "Error: invalid option" << endl;
-                    exit(1);
-            }  // switch ..choice
-        }  // while
-    }  // getMode()
-    
+                }  // switch ..choice
+            }  // while
+            if (!rSchemeProvided)   {
+                cerr << "No routing mode specified" << endl;
+                exit(1);
+            }
+        }  // getMode()
+        
 
-    //TODO IMPLEMENT
-    void takeInData()   {
+        void takeInData()   {
 
-        //Put in main
-        std::ios::sync_with_stdio(false);
+            //Put in main
+            std::ios::sync_with_stdio(false);
 
-        string layoutType;
-        string numLevels;
-        string floorSize;
+            string layoutType;
+            string numLevels;
+            string floorSize;
 
-        //Maybe cin >> layoutType >> numLevels >> floorSize; ?
-        getline(cin,layoutType);
-        getline(cin, numLevels);
-        getline(cin, floorSize);
+            getline(cin, layoutType);
+            getline(cin, numLevels);
+            getline(cin, floorSize);
 
-        int numLevelsInt = stoi(numLevels);
-        int floorSizeInt = stoi(floorSize);
-
-        d.floors = numLevelsInt;
-        d.rows = floorSizeInt;
-
-        if (layoutType[0] == 'L')   {
-            takeInDataList(numLevelsInt, floorSizeInt);
-        }
-        else{
-            takeInDataMap(floorSizeInt, numLevelsInt);
-        }
-    } //layout type M
+            cout << "LayoutType: " << layoutType << endl;
+            cout << "numLevels: " << numLevels << endl;
+            cout << "floorSize: " << floorSize << endl;
 
 
-    //TODO IMPLEMENT
-    void findFastestRoute() {
-        if (useStack)   {
-            findFastestRouteStack();
-        }
-        else    {
-            findFastestRouteQueue();
-        }
-        storePath(hangar);
-    } 
 
-    //TODO IMPLEMENT
-    void outputInstructions()   {
+            size_t numLevelsInt = static_cast<size_t>(stoul(numLevels));
+            size_t floorSizeInt = static_cast<size_t>(stoul(floorSize));
+
+            d.floors = numLevelsInt;
+            d.rows = floorSizeInt;
+
+            if (layoutType[0] == 'L')   {
+                takeInDataList();
+            }
+            else{
+                takeInDataMap();
+            }
+        } //layout type M
+
+
+        //TODO IMPLEMENT
+        void findFastestRoute() {
+            if (useStack)   {
+                findFastestRouteStack();
+            }
+            else    {
+                findFastestRouteQueue();
+            }
+            storePath(&hangar);
+        } 
+
+        //TODO IMPLEMENT
+        void outputInstructions()   {
         if (isMapOutput)    {
             cout << "Start in level " << start.floor <<", row " << start.row << ", column "<< start.col << "\n";
             outputInstructionsM();
         }
         else    {
             cout << "//path taken";
-            outputInstructionsL();
+            if (foundRoute) {
+                outputInstructionsL();
+            }
+            else    {
+                cerr << "Path not found" << endl;
+            }
         }
     }
 
     private:
         bool useStack;
+        bool rSchemeProvided;
         bool isMapOutput;
-        int fileIndex;
 
         struct coord    {
-            int floor;
-            int row;
-            int col;
+            size_t floor;
+            size_t row;
+            size_t col;
 
-            coord(): floor(-1), row(-1), col(-1){}
-            coord(int f, int r, int c): floor(f), row(r), col(c){}
+            coord(): floor(0), row(0), col(0){}
+            coord(size_t f, size_t r, size_t c): floor(f), row(r), col(c){}
         };
 
         struct location {
-            bool discovered = false;
+            bool discovered;
             char val;
             location* prev;
             location* next;
 
             coord myCoord;
 
-            location(char c): val(c){}
+            location(): discovered(false), val('a'), prev(nullptr), next(nullptr){}
+            location(char c): discovered(false), val(c){}
         };
 
         struct dimensions   {
-            int rows;
-            int floors;
+            size_t rows;
+            size_t floors;
         };
 
         //Level, row, column
@@ -158,23 +198,29 @@ class getFastestRoute   {
         deque<location> searchContainer;
         dimensions d;
         location hangar;
-        vector<location> path;
+        bool foundRoute;
 
 
-        void takeInDataMap(int floorSize, int numFloors)    {
-            layout.reserve(numFloors);
-            vector<vector<location>> floorData(floorSize);
+        //check that each char is valid
+        void takeInDataMap()    {
+            layout.reserve(d.floors);
+            vector<vector<location>> floorData;
             string fileData;
-            int counter = 0;
-            int floorCount = 0;
+            size_t counter = 0;
+            size_t floorCount = 0;
 
 
             while (getline(cin, fileData))  {
-                vector<location> oneRow(floorSize);
-                if (fileData[0] == '/') {
+                vector<location> oneRow;
+                if (fileData[0] == '/' || fileData.empty()) {
                     continue;
                 }
-                for (int i = 0; i < fileData.size(); ++i) {
+                for (size_t i = 0; i < fileData.size(); ++i) {
+                    if (!isMapCharValid(fileData[i]))  {
+                        cerr << "Invalid map character" << endl;
+                        exit(1);
+                    }
+
                     oneRow.push_back(location(fileData[i]));
 
                     if (fileData[i] == 'S')   {
@@ -186,41 +232,113 @@ class getFastestRoute   {
                 floorData.push_back(oneRow);
                 ++counter;
 
-                if (counter == floorSize)   {
+                if (counter == d.rows)   {
                     layout.push_back(floorData);
                     floorData.clear();
                     ++floorCount;
+                    counter = 0;
                 }
-
             }
-
         }
-
-        void takeInDataList(int floorSize, int numFloors)   {
-
+        
+        //ERROR CHECK: check that for each coordinate, the level row and column are valid
+        //check that each val is valid
+        void takeInDataList()   {
             //Fill Layout Grid with . with correct sizing
-            vector<vector<location>> floorData(floorSize, vector<location>(floorSize, location('.')));
-            layout.resize(numFloors, floorData);
+            vector<vector<location>> floorData(d.rows, vector<location>(d.rows, location('.')));
+            layout.resize(d.floors, floorData);
 
             string lineData;
+            vector<string> line;
+
             while(getline(cin, lineData))  {
                 if (lineData[0] != '(') {
                     continue;
                 }
+                assert(lineData.size() >= 9);
 
-                char level = lineData[2];
-                char row = lineData[4];
-                char col = lineData[6];
-                char val = lineData[8];
-
-                if (val == 'S') {
-                    start.col = col;
-                    start.row = row;
-                    start.floor = level;
+                int counter = 0;
+                string stLevel = "";
+                string stRow = "";
+                string stCol = "";
+                char val;
+                for (auto l : lineData) {
+                    if (l != ',' && l != '(' && l != ')')   {
+                        if (counter == 0)   {
+                            stLevel += l;
+                        }
+                        else if (counter == 1)  {
+                            stRow += l;
+                        }
+                        else if (counter == 2)  {
+                            stCol += l;
+                        }
+                        else    {
+                            val = l;
+                        }
+                    }
+                    if (l == ',')   {
+                        ++counter;
+                    }
                 }
 
-                layout[level][row][col] = location(val);
+                
+                int level = stoi(stLevel);
+                int row = stoi(stRow);
+                int col = stoi(stCol);
+                
+
+                if (level >= (int)d.floors || level < 0) {
+                    cerr << "Invalid map level" << endl;
+                    exit(1);
+                }
+                if (row >= (int)d.rows || row < 0)   {
+                    cerr << "Invalid map row" << endl;
+                    exit(1);
+                }
+                if (col >= (int)d.rows || col < 0)   {
+                    cerr << "Invalid map column" << endl;
+                    exit(1);
+                }
+
+                size_t sLevel = static_cast<size_t>(level);
+                size_t sRow = static_cast<size_t>(row);
+                size_t sCol = static_cast<size_t>(col);
+
+                if (!isMapCharValid(val))    {
+                     cerr << "Invalid map character" << endl;
+                    exit(1);
+                }
+
+
+                if (val == 'S') {
+                    start.col = sCol;
+                    start.row = sRow;
+                    start.floor = sLevel;
+                }
+                location l(val);
+                layout[sLevel][sRow][sCol] = l;
             }
+        }
+
+
+        bool isMapCharValid(char val)   {
+            if (val == 'S') {
+                return true;
+            }
+            if (val == 'E') {
+                return true;
+            }
+            if (val == 'H') {
+                return true;
+            }
+            if (val == '.') {
+                return true;
+            }
+            if (val == '#') {
+                return true;
+            }
+            return false;    
         }
 
         //Stack LIFO: push_back, pop_back
@@ -228,6 +346,11 @@ class getFastestRoute   {
         //Return of this function.myCoord = start means hanger not found
         //TODO build function to take out code duplication
         location findFastestRouteStack()    {
+            if (layout.empty() || layout[start.floor].empty() || layout[start.floor][start.row].empty()) {
+                cerr << "Layout vector is not properly initialized or accessed out of bounds" << endl;
+                exit(1);
+            }
+            
             location& startLoc = layout[start.floor][start.row][start.col];
             startLoc.myCoord = start;
             startLoc.prev = nullptr;
@@ -244,81 +367,83 @@ class getFastestRoute   {
                     return currentLoc;
                 }
 
-                if (currentLoc.val == 'E')  {
-                    for (int i = 0; i < d.floors; ++i)  {
-                        if (currCoord.floor != i)   {
-                            location& loc = layout[i][currCoord.row][currCoord.col];
-                            loc.myCoord = currCoord;
-                            loc.myCoord.floor = i;
-                            loc.discovered = true;
-                            loc.prev = &currentLoc;
-                            searchContainer.push_back(loc);
-                        }
-                    }
-                }
-
                 if (currCoord.row > 0) {
                     location& north = layout[currCoord.floor][currCoord.row - 1][currCoord.col];
 
                     if (!north.discovered && north.val != '#')  {
                         north.prev = &currentLoc;
                         searchContainer.push_back(north);
-                        north.myCoord = currCoord;
+                        north.myCoord = {currCoord.floor, currCoord.row - 1, currCoord.col};
                         north.discovered = true;
-                        --north.myCoord.row;
 
                         if (north.val == 'H')   {
                             hangar = north;
+                            foundRoute = true;
                             return north;
                         }
                     }
                 }
-                if (currCoord.row < d.rows - 1)    {
-                    location& south = layout[currCoord.floor][currCoord.row + 1][currCoord.col];
 
-                    if (!south.discovered && south.val != '#')  {
-                        south.prev = &currentLoc;
-                        searchContainer.push_back(south);
-                        south.myCoord = currCoord;
-                        south.discovered = true;
-                        ++south.myCoord.row;
-
-                        if (south.val == 'H')   {
-                            hangar = south;
-                            return south;
-                        }
-                    }
-                }
-                if (currCoord.col > 0)  {
-                    location& west = layout[currCoord.floor][currCoord.row][currCoord.col - 1];
-
-
-                    if (!west.discovered && west.val != '#')  {
-                        west.prev = &currentLoc;
-                        searchContainer.push_back(west);
-                        west.myCoord = currCoord;
-                        west.discovered = true;
-                        --west.myCoord.col;
-
-                        if (west.val == 'H')   {
-                            hangar = west;
-                            return west;
-                        }
-                    }
-                }
                 if (currCoord.col < d.rows - 1) {
                     location& east = layout[currCoord.floor][currCoord.row][currCoord.col + 1];
 
                     if (!east.discovered && east.val != '#')  {
                         east.prev = &currentLoc;
                         searchContainer.push_back(east);
-                        east.myCoord = currCoord;
+                        east.myCoord = {currCoord.floor, currCoord.row, currCoord.col + 1};
                         east.discovered = true;
-                        ++east.myCoord.col;
 
                         if (east.val == 'H')   {
                             hangar = east;
+                            foundRoute = true;
                             return east;
+                        }
+                    }
+                }
+
+                if (currCoord.row < d.rows - 1)    {
+                    location& south = layout[currCoord.floor][currCoord.row + 1][currCoord.col];
+
+                    if (!south.discovered && south.val != '#')  {
+                        south.prev = &currentLoc;
+                        searchContainer.push_back(south);
+                        south.myCoord = {currCoord.floor, currCoord.row + 1, currCoord.col};
+                        south.discovered = true;
+
+                        if (south.val == 'H')   {
+                            hangar = south;
+                            foundRoute = true;
+                            return south;
+                        }
+                    }
+                }
+
+               if (currCoord.col > 0)  {
+                    location& west = layout[currCoord.floor][currCoord.row][currCoord.col - 1];
+
+
+                    if (!west.discovered && west.val != '#')  {
+                        west.prev = &currentLoc;
+                        searchContainer.push_back(west);
+                        west.myCoord = {currCoord.floor, currCoord.row, currCoord.col - 1};
+                        west.discovered = true;
+
+                        if (west.val == 'H')   {
+                            hangar = west;
+                            foundRoute = true;
+                            return west;
+                        }
+                    }
+                }
+                if (currentLoc.val == 'E')  {
+                    for (size_t i = 0; i < d.floors; ++i)  {
+                        location& loc = layout[i][currCoord.row][currCoord.col];
+                        if (currCoord.floor != i && !loc.discovered
+                            && loc.val == 'E')   {
+                            loc.myCoord = {i, currCoord.row, currCoord.col};
+                            loc.discovered = true;
+                            loc.prev = &currentLoc;
+                            searchContainer.push_back(loc);
                         }
                     }
                 }
@@ -348,18 +473,6 @@ class getFastestRoute   {
                     hangar = currentLoc;
                     return currentLoc;
                 }
-                if (currentLoc.val == 'E')  {
-                    for (int i = 0; i < d.floors; ++i)  {
-                        if (currCoord.floor != i)   {
-                            location& loc = layout[i][currCoord.row][currCoord.col];
-                            loc.myCoord = currCoord;
-                            loc.myCoord.floor = i;
-                            loc.discovered = true;
-                            loc.prev = &currentLoc;
-                            searchContainer.push_back(loc);
-                        }
-                    }
-                }
 
                 if (currCoord.row > 0) {
                     location& north = layout[currCoord.floor][currCoord.row - 1][currCoord.col];
@@ -367,62 +480,77 @@ class getFastestRoute   {
                     if (!north.discovered && north.val != '#')  {
                         north.prev = &currentLoc;
                         searchContainer.push_back(north);
-                        north.myCoord = currCoord;
+                        north.myCoord = {currCoord.floor, currCoord.row - 1, currCoord.col};
                         north.discovered = true;
-                        --north.myCoord.row;
 
                         if (north.val == 'H')   {
                             hangar = north;
+                            foundRoute = true;
                             return north;
                         }
                     }
                 }
-                if (currCoord.row < d.rows - 1)    {
-                    location& south = layout[currCoord.floor][currCoord.row + 1][currCoord.col];
 
-                    if (!south.discovered && south.val != '#')  {
-                        south.prev = &currentLoc;
-                        searchContainer.push_back(south);
-                        south.myCoord = currCoord;
-                        south.discovered = true;
-                        ++south.myCoord.row;
-
-                        if (south.val == 'H')   {
-                            hangar = south;
-                            return south;
-                        }
-                    }
-                }
-                if (currCoord.col > 0)  {
-                    location& west = layout[currCoord.floor][currCoord.row][currCoord.col - 1];
-
-
-                    if (!west.discovered && west.val != '#')  {
-                        west.prev = &currentLoc;
-                        searchContainer.push_back(west);
-                        west.myCoord = currCoord;
-                        west.discovered = true;
-                        --west.myCoord.col;
-
-                        if (west.val == 'H')   {
-                            hangar = west;
-                            return west;
-                        }
-                    }
-                }
                 if (currCoord.col < d.rows - 1) {
                     location& east = layout[currCoord.floor][currCoord.row][currCoord.col + 1];
 
                     if (!east.discovered && east.val != '#')  {
                         east.prev = &currentLoc;
                         searchContainer.push_back(east);
-                        east.myCoord = currCoord;
+                        east.myCoord = {currCoord.floor, currCoord.row, currCoord.col + 1};
                         east.discovered = true;
-                        ++east.myCoord.col;
 
                         if (east.val == 'H')   {
                             hangar = east;
+                            foundRoute = true;
                             return east;
+                        }
+                    }
+                }
+
+                if (currCoord.row < d.rows - 1)    {
+                    location& south = layout[currCoord.floor][currCoord.row + 1][currCoord.col];
+
+                    if (!south.discovered && south.val != '#')  {
+                        south.prev = &currentLoc;
+                        searchContainer.push_back(south);
+                        south.myCoord = {currCoord.floor, currCoord.row + 1, currCoord.col};
+                        south.discovered = true;
+
+                        if (south.val == 'H')   {
+                            hangar = south;
+                            foundRoute = true;
+                            return south;
+                        }
+                    }
+                }
+
+               if (currCoord.col > 0)  {
+                    location& west = layout[currCoord.floor][currCoord.row][currCoord.col - 1];
+
+
+                    if (!west.discovered && west.val != '#')  {
+                        west.prev = &currentLoc;
+                        searchContainer.push_back(west);
+                        west.myCoord = {currCoord.floor, currCoord.row, currCoord.col - 1};
+                        west.discovered = true;
+
+                        if (west.val == 'H')   {
+                            hangar = west;
+                            foundRoute = true;
+                            return west;
+                        }
+                    }
+                }
+                if (currentLoc.val == 'E')  {
+                    for (size_t i = 0; i < d.floors; ++i)  {
+                        location& loc = layout[i][currCoord.row][currCoord.col];
+                        if (currCoord.floor != i && !loc.discovered
+                            && loc.val == 'E')   {
+                            loc.myCoord = {i, currCoord.row, currCoord.col};
+                            loc.discovered = true;
+                            loc.prev = &currentLoc;
+                            searchContainer.push_back(loc);
                         }
                     }
                 }
@@ -431,38 +559,35 @@ class getFastestRoute   {
             return startLoc;
         }
     
-        void storePath(location goal)    {
-            if (goal.prev == nullptr) {
+        void storePath(location* goal)    {
+            if (goal->prev == nullptr)  {
                 return;
             }
-            if (goal.myCoord.col > goal.prev->myCoord.col)  {
-                goal.prev->val = 'e';
-                goal.prev->next = &goal;
+
+            if (goal->myCoord.col > goal->prev->myCoord.col)  {
+                goal->prev->val = 'e';
             }
-            else if (goal.myCoord.col < goal.prev->myCoord.col)  {
-                goal.prev->val = 'w';
-                goal.prev->next = &goal;
+            else if (goal->myCoord.col < goal->prev->myCoord.col)  {
+                goal->prev->val = 'w';
             }
-            else if (goal.myCoord.row > goal.prev->myCoord.row)  {
-                goal.prev->val = 's';
-                goal.prev->next = &goal;
+            else if (goal->myCoord.row > goal->prev->myCoord.row)  {
+                goal->prev->val = 'n';
             }
-            else if (goal.myCoord.row < goal.prev->myCoord.row)  {
-                goal.prev->val = 'n';
-                goal.prev->next = &goal;
+            else if (goal->myCoord.row < goal->prev->myCoord.row)  {
+                goal->prev->val = 's';
             }
             else {
-                goal.prev->val = goal.myCoord.floor;
-                goal.prev->next = &goal;
+                goal->prev->val = static_cast<char>(goal->myCoord.floor);
             }
-            return storePath(*goal.prev);
+
+            return storePath(goal->prev);
         }
 
         void outputInstructionsM()  {
-            for (int i = 0; i < d.floors; ++i)  {
+            for (size_t i = 0; i < d.floors; ++i)  {
                 cout << "//level " << i << "\n";
-                for (int j = 0; j < d.rows; ++j)    {
-                    for (int k = 0; k < d.rows; ++k)    {
+                for (size_t j = 0; j < d.rows; ++j)    {
+                    for (size_t k = 0; k < d.rows; ++k)    {
                         cout << layout[i][j][k].val;
                     }
                     cout << "\n";
@@ -472,12 +597,37 @@ class getFastestRoute   {
         
         void outputInstructionsL()  {
             location curr = layout[start.floor][start.row][start.col];
-            while (curr.next != nullptr)    {
+            while (curr.val != 'H')    {
                 cout << "(" << curr.myCoord.floor << "," << curr.myCoord.row << "," 
                 << curr.myCoord.col << "," << curr.val << ")\n";
-                curr = *curr.next;
+                
+                if (curr.val == 'n')    {
+                    curr = layout[curr.myCoord.floor][curr.myCoord.row + 1][curr.myCoord.col];
+                }
+                if (curr.val == 's')    {
+                    curr = layout[curr.myCoord.floor][curr.myCoord.row - 1][curr.myCoord.col];
+                }
+                if (curr.val == 'e')    {
+                    curr = layout[curr.myCoord.floor][curr.myCoord.row][curr.myCoord.col + 1];
+                }
+                if (curr.val == 'w')    {
+                    curr = layout[curr.myCoord.floor][curr.myCoord.row][curr.myCoord.col - 1];
+                }
+                else    {
+                    cerr << curr.val << endl;
+                    int floor = int(curr.val);
+                    size_t sFloor = static_cast<size_t>(floor);
+                    curr = layout[sFloor][curr.myCoord.row][curr.myCoord.col];
+                }
             }
         }
     
 };
 
+int main(int argc, char * argv[])   {
+    getFastestRoute tester;
+    tester.getMode(argc, argv);
+    tester.takeInData();
+    tester.findFastestRoute();
+    tester.outputInstructions();
+}
