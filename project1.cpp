@@ -11,7 +11,7 @@ using namespace std;
 
 class getFastestRoute   {
     public:
-        getFastestRoute(): useStack(false), rSchemeProvided(false), isMapOutput(true), foundRoute(false){}
+        getFastestRoute(): useStack(false), rSchemeProvided(false), isMapOutput(true), start(0,0,0), hangar(0,0,0), foundRoute(false){}
 
         void printHelp()    {
             //TODO IMPLEMENT
@@ -101,9 +101,6 @@ class getFastestRoute   {
 
         void takeInData()   {
 
-            //Put in main
-            std::ios::sync_with_stdio(false);
-
             string layoutType;
             string numLevels;
             string floorSize;
@@ -112,14 +109,9 @@ class getFastestRoute   {
             getline(cin, numLevels);
             getline(cin, floorSize);
 
-            cout << "LayoutType: " << layoutType << endl;
-            cout << "numLevels: " << numLevels << endl;
-            cout << "floorSize: " << floorSize << endl;
-
-
-
-            size_t numLevelsInt = static_cast<size_t>(stoul(numLevels));
-            size_t floorSizeInt = static_cast<size_t>(stoul(floorSize));
+            
+            uint32_t numLevelsInt = static_cast<uint32_t>(stoul(numLevels));
+            uint32_t floorSizeInt = static_cast<uint32_t>(stoul(floorSize));
 
             d.floors = numLevelsInt;
             d.rows = floorSizeInt;
@@ -130,10 +122,9 @@ class getFastestRoute   {
             else{
                 takeInDataMap();
             }
-        } //layout type M
+        } 
 
 
-        //TODO IMPLEMENT
         void findFastestRoute() {
             if (useStack)   {
                 findFastestRouteStack();
@@ -141,25 +132,22 @@ class getFastestRoute   {
             else    {
                 findFastestRouteQueue();
             }
-            storePath(&hangar);
+            if (foundRoute) {
+                storePath(hangar);
+            }
         } 
 
-        //TODO IMPLEMENT
         void outputInstructions()   {
-        if (isMapOutput)    {
-            cout << "Start in level " << start.floor <<", row " << start.row << ", column "<< start.col << "\n";
-            outputInstructionsM();
-        }
-        else    {
-            cout << "//path taken";
-            if (foundRoute) {
-                outputInstructionsL();
+            if (isMapOutput)    {
+                outputInstructionsM();
             }
             else    {
-                cerr << "Path not found" << endl;
+                cout << "//path taken" << endl;
+                if (foundRoute) {
+                    outputInstructionsL();
+                }
             }
         }
-    }
 
     private:
         bool useStack;
@@ -167,37 +155,63 @@ class getFastestRoute   {
         bool isMapOutput;
 
         struct coord    {
-            size_t floor;
-            size_t row;
-            size_t col;
+            uint32_t floor;
+            uint32_t row;
+            uint32_t col;
 
             coord(): floor(0), row(0), col(0){}
-            coord(size_t f, size_t r, size_t c): floor(f), row(r), col(c){}
+            coord(uint32_t f, uint32_t r, uint32_t c): floor(f), row(r), col(c){}
+            coord(const coord& copy):  floor(copy.floor), row(copy.row), col(copy.col){};
+
+            bool operator!=(coord& rhs) const {
+                return !(floor == rhs.floor && row == rhs.row && col == rhs.col);
+            }
+            bool operator==(coord& rhs) const {
+                return floor == rhs.floor && row == rhs.row && col == rhs.col;
+            }
+
+            coord& operator=(const coord& rhs) {
+                if (this != &rhs)   {
+                    floor = rhs.floor;
+                    row = rhs.row;
+                    col = rhs.col;
+                }
+                return *this;
+            }
+            
         };
 
         struct location {
             bool discovered;
             char val;
-            location* prev;
-            location* next;
+            char prev;
+            
+            location(): discovered(false), val('a'), prev('\n'){}
+            location(char c): discovered(false), val(c), prev('\n'){}
+            location(const location& copy): discovered(copy.discovered),
+             val(copy.val), prev(copy.prev){}
 
-            coord myCoord;
-
-            location(): discovered(false), val('a'), prev(nullptr), next(nullptr){}
-            location(char c): discovered(false), val(c){}
+            location& operator=(const location& rhs) {
+                if (this != &rhs)   {
+                    discovered = rhs.discovered;
+                    val = rhs.val;
+                    prev = rhs.prev;
+                }
+                return *this;
+            };
         };
 
         struct dimensions   {
-            size_t rows;
-            size_t floors;
+            uint32_t rows;
+            uint32_t floors;
         };
 
         //Level, row, column
         vector<vector<vector<location>>> layout;
         coord start;
-        deque<location> searchContainer;
+        coord hangar;
+        deque<coord> searchContainer;
         dimensions d;
-        location hangar;
         bool foundRoute;
 
 
@@ -206,8 +220,8 @@ class getFastestRoute   {
             layout.reserve(d.floors);
             vector<vector<location>> floorData;
             string fileData;
-            size_t counter = 0;
-            size_t floorCount = 0;
+            uint32_t counter = 0;
+            uint32_t floorCount = 0;
 
 
             while (getline(cin, fileData))  {
@@ -215,7 +229,7 @@ class getFastestRoute   {
                 if (fileData[0] == '/' || fileData.empty()) {
                     continue;
                 }
-                for (size_t i = 0; i < fileData.size(); ++i) {
+                for (uint32_t i = 0; i < fileData.size(); ++i) {
                     if (!isMapCharValid(fileData[i]))  {
                         cerr << "Invalid map character" << endl;
                         exit(1);
@@ -249,7 +263,6 @@ class getFastestRoute   {
             layout.resize(d.floors, floorData);
 
             string lineData;
-            vector<string> line;
 
             while(getline(cin, lineData))  {
                 if (lineData[0] != '(') {
@@ -261,7 +274,7 @@ class getFastestRoute   {
                 string stLevel = "";
                 string stRow = "";
                 string stCol = "";
-                char val;
+                char val = '\n';
                 for (auto l : lineData) {
                     if (l != ',' && l != '(' && l != ')')   {
                         if (counter == 0)   {
@@ -301,9 +314,9 @@ class getFastestRoute   {
                     exit(1);
                 }
 
-                size_t sLevel = static_cast<size_t>(level);
-                size_t sRow = static_cast<size_t>(row);
-                size_t sCol = static_cast<size_t>(col);
+                uint32_t sLevel = static_cast<uint32_t>(level);
+                uint32_t sRow = static_cast<uint32_t>(row);
+                uint32_t sCol = static_cast<uint32_t>(col);
 
                 if (!isMapCharValid(val))    {
                      cerr << "Invalid map character" << endl;
@@ -316,8 +329,7 @@ class getFastestRoute   {
                     start.row = sRow;
                     start.floor = sLevel;
                 }
-                location l(val);
-                layout[sLevel][sRow][sCol] = l;
+                layout[sLevel][sRow][sCol] = location(val);
             }
         }
 
@@ -344,250 +356,150 @@ class getFastestRoute   {
         //Stack LIFO: push_back, pop_back
         //Returns start location if hanger not found. 
         //Return of this function.myCoord = start means hanger not found
-        //TODO build function to take out code duplication
-        location findFastestRouteStack()    {
-            if (layout.empty() || layout[start.floor].empty() || layout[start.floor][start.row].empty()) {
-                cerr << "Layout vector is not properly initialized or accessed out of bounds" << endl;
-                exit(1);
-            }
-            
-            location& startLoc = layout[start.floor][start.row][start.col];
-            startLoc.myCoord = start;
-            startLoc.prev = nullptr;
-            searchContainer.push_back(startLoc);
-            startLoc.discovered = true;
+        void findFastestRouteStack()    {            
+            layout[start.floor][start.row][start.col].discovered = true;
+            searchContainer.push_back(start);
 
-            while(!searchContainer.empty()) {
-                location currentLoc = searchContainer.back();
-                coord currCoord = currentLoc.myCoord;
+            while(!searchContainer.empty() && !foundRoute) {
+                coord currentLocC = searchContainer.back();
                 searchContainer.pop_back();
 
-                if (currentLoc.val == 'H')  {
-                    hangar = currentLoc;
-                    return currentLoc;
-                }
-
-                if (currCoord.row > 0) {
-                    location& north = layout[currCoord.floor][currCoord.row - 1][currCoord.col];
-
-                    if (!north.discovered && north.val != '#')  {
-                        north.prev = &currentLoc;
-                        searchContainer.push_back(north);
-                        north.myCoord = {currCoord.floor, currCoord.row - 1, currCoord.col};
-                        north.discovered = true;
-
-                        if (north.val == 'H')   {
-                            hangar = north;
-                            foundRoute = true;
-                            return north;
-                        }
-                    }
-                }
-
-                if (currCoord.col < d.rows - 1) {
-                    location& east = layout[currCoord.floor][currCoord.row][currCoord.col + 1];
-
-                    if (!east.discovered && east.val != '#')  {
-                        east.prev = &currentLoc;
-                        searchContainer.push_back(east);
-                        east.myCoord = {currCoord.floor, currCoord.row, currCoord.col + 1};
-                        east.discovered = true;
-
-                        if (east.val == 'H')   {
-                            hangar = east;
-                            foundRoute = true;
-                            return east;
-                        }
-                    }
-                }
-
-                if (currCoord.row < d.rows - 1)    {
-                    location& south = layout[currCoord.floor][currCoord.row + 1][currCoord.col];
-
-                    if (!south.discovered && south.val != '#')  {
-                        south.prev = &currentLoc;
-                        searchContainer.push_back(south);
-                        south.myCoord = {currCoord.floor, currCoord.row + 1, currCoord.col};
-                        south.discovered = true;
-
-                        if (south.val == 'H')   {
-                            hangar = south;
-                            foundRoute = true;
-                            return south;
-                        }
-                    }
-                }
-
-               if (currCoord.col > 0)  {
-                    location& west = layout[currCoord.floor][currCoord.row][currCoord.col - 1];
-
-
-                    if (!west.discovered && west.val != '#')  {
-                        west.prev = &currentLoc;
-                        searchContainer.push_back(west);
-                        west.myCoord = {currCoord.floor, currCoord.row, currCoord.col - 1};
-                        west.discovered = true;
-
-                        if (west.val == 'H')   {
-                            hangar = west;
-                            foundRoute = true;
-                            return west;
-                        }
-                    }
-                }
-                if (currentLoc.val == 'E')  {
-                    for (size_t i = 0; i < d.floors; ++i)  {
-                        location& loc = layout[i][currCoord.row][currCoord.col];
-                        if (currCoord.floor != i && !loc.discovered
-                            && loc.val == 'E')   {
-                            loc.myCoord = {i, currCoord.row, currCoord.col};
-                            loc.discovered = true;
-                            loc.prev = &currentLoc;
-                            searchContainer.push_back(loc);
-                        }
-                    }
-                }
+                foundRoute = checkNESW(currentLocC);
             }
-            hangar = startLoc;
-            return startLoc;
         }
         
 
         //Queue FIFO: push_back, pop_front
-        //TODO build function to take out code duplication
-        //TODO CHECK ELEVATORS
-        location findFastestRouteQueue()    {
-            location& startLoc = layout[start.floor][start.row][start.col];
-            startLoc.myCoord = start;
-            startLoc.prev = nullptr;
-            searchContainer.push_back(startLoc);
-            startLoc.discovered = true;
+        void findFastestRouteQueue()    {
+            layout[start.floor][start.row][start.col].discovered = true;
+            searchContainer.push_back(start);
 
-
-            while(!searchContainer.empty()) {
-                location currentLoc = searchContainer.front();
-                coord currCoord = currentLoc.myCoord;
+            while(!searchContainer.empty() && !foundRoute) {
+                coord currentLocC = searchContainer.front();
                 searchContainer.pop_front();
 
-                if (currentLoc.val == 'H')  {
-                    hangar = currentLoc;
-                    return currentLoc;
-                }
-
-                if (currCoord.row > 0) {
-                    location& north = layout[currCoord.floor][currCoord.row - 1][currCoord.col];
-
-                    if (!north.discovered && north.val != '#')  {
-                        north.prev = &currentLoc;
-                        searchContainer.push_back(north);
-                        north.myCoord = {currCoord.floor, currCoord.row - 1, currCoord.col};
-                        north.discovered = true;
-
-                        if (north.val == 'H')   {
-                            hangar = north;
-                            foundRoute = true;
-                            return north;
-                        }
-                    }
-                }
-
-                if (currCoord.col < d.rows - 1) {
-                    location& east = layout[currCoord.floor][currCoord.row][currCoord.col + 1];
-
-                    if (!east.discovered && east.val != '#')  {
-                        east.prev = &currentLoc;
-                        searchContainer.push_back(east);
-                        east.myCoord = {currCoord.floor, currCoord.row, currCoord.col + 1};
-                        east.discovered = true;
-
-                        if (east.val == 'H')   {
-                            hangar = east;
-                            foundRoute = true;
-                            return east;
-                        }
-                    }
-                }
-
-                if (currCoord.row < d.rows - 1)    {
-                    location& south = layout[currCoord.floor][currCoord.row + 1][currCoord.col];
-
-                    if (!south.discovered && south.val != '#')  {
-                        south.prev = &currentLoc;
-                        searchContainer.push_back(south);
-                        south.myCoord = {currCoord.floor, currCoord.row + 1, currCoord.col};
-                        south.discovered = true;
-
-                        if (south.val == 'H')   {
-                            hangar = south;
-                            foundRoute = true;
-                            return south;
-                        }
-                    }
-                }
-
-               if (currCoord.col > 0)  {
-                    location& west = layout[currCoord.floor][currCoord.row][currCoord.col - 1];
-
-
-                    if (!west.discovered && west.val != '#')  {
-                        west.prev = &currentLoc;
-                        searchContainer.push_back(west);
-                        west.myCoord = {currCoord.floor, currCoord.row, currCoord.col - 1};
-                        west.discovered = true;
-
-                        if (west.val == 'H')   {
-                            hangar = west;
-                            foundRoute = true;
-                            return west;
-                        }
-                    }
-                }
-                if (currentLoc.val == 'E')  {
-                    for (size_t i = 0; i < d.floors; ++i)  {
-                        location& loc = layout[i][currCoord.row][currCoord.col];
-                        if (currCoord.floor != i && !loc.discovered
-                            && loc.val == 'E')   {
-                            loc.myCoord = {i, currCoord.row, currCoord.col};
-                            loc.discovered = true;
-                            loc.prev = &currentLoc;
-                            searchContainer.push_back(loc);
-                        }
-                    }
-                }
+                foundRoute = checkNESW(currentLocC);
             }
-            hangar = startLoc;
-            return startLoc;
         }
     
-        void storePath(location* goal)    {
-            if (goal->prev == nullptr)  {
-                return;
+    
+        bool checkNESW(coord currCoord)   {
+            if (currCoord.row > 0
+                &&!layout[currCoord.floor][currCoord.row - 1][currCoord.col].discovered 
+                && layout[currCoord.floor][currCoord.row - 1][currCoord.col].val != '#')  {
+
+                location& north = layout[currCoord.floor][currCoord.row - 1][currCoord.col];
+                north.prev = 's';
+                north.discovered = true;
+                searchContainer.push_back(coord(currCoord.floor, currCoord.row - 1, currCoord.col));
+
+                if (north.val == 'H')   {
+                    hangar = coord(currCoord.floor, currCoord.row - 1, currCoord.col);
+                    
+                    return true;
+                }
             }
 
-            if (goal->myCoord.col > goal->prev->myCoord.col)  {
-                goal->prev->val = 'e';
-            }
-            else if (goal->myCoord.col < goal->prev->myCoord.col)  {
-                goal->prev->val = 'w';
-            }
-            else if (goal->myCoord.row > goal->prev->myCoord.row)  {
-                goal->prev->val = 'n';
-            }
-            else if (goal->myCoord.row < goal->prev->myCoord.row)  {
-                goal->prev->val = 's';
-            }
-            else {
-                goal->prev->val = static_cast<char>(goal->myCoord.floor);
+            if (currCoord.col < d.rows - 1
+                &&!layout[currCoord.floor][currCoord.row][currCoord.col + 1].discovered 
+                && layout[currCoord.floor][currCoord.row][currCoord.col + 1].val != '#')  {
+
+                location& east = layout[currCoord.floor][currCoord.row][currCoord.col + 1];
+                east.prev = 'w';
+                east.discovered = true;
+                searchContainer.push_back(coord(currCoord.floor, currCoord.row, currCoord.col + 1));
+
+                if (east.val == 'H')   {
+                    hangar = coord(currCoord.floor, currCoord.row, currCoord.col + 1);
+                    return true;
+                }
             }
 
-            return storePath(goal->prev);
+            if (currCoord.row < d.rows - 1 
+                && !layout[currCoord.floor][currCoord.row + 1][currCoord.col].discovered 
+                && layout[currCoord.floor][currCoord.row + 1][currCoord.col].val != '#')  {
+
+                location& south = layout[currCoord.floor][currCoord.row + 1][currCoord.col];
+                south.prev = 'n';
+                south.discovered = true;
+                searchContainer.push_back(coord(currCoord.floor, currCoord.row + 1, currCoord.col));
+
+                if (south.val == 'H')   {
+                    hangar = coord(currCoord.floor, currCoord.row + 1, currCoord.col);
+                    return true;
+                }
+            }
+
+           if (currCoord.col > 0  
+                && !layout[currCoord.floor][currCoord.row][currCoord.col - 1].discovered 
+                && layout[currCoord.floor][currCoord.row][currCoord.col - 1].val != '#')  {
+
+                location& west = layout[currCoord.floor][currCoord.row][currCoord.col - 1];
+                west.discovered = true;
+                west.prev = 'e';
+                searchContainer.push_back(coord(currCoord.floor, currCoord.row, currCoord.col - 1));
+
+                if (west.val == 'H')   {
+                    hangar = coord(currCoord.floor, currCoord.row, currCoord.col - 1);
+                    return true;
+                }
+            }
+
+            if (layout[currCoord.floor][currCoord.row][currCoord.col].val == 'E')  {
+                for (uint32_t i = 0; i < d.floors; ++i)  {
+                    location& loc = layout[i][currCoord.row][currCoord.col];
+                    if (currCoord.floor != i && !loc.discovered
+                        && loc.val == 'E')   {
+                        loc.discovered = true;
+                        loc.prev = static_cast<char>('0' + currCoord.floor);
+                        searchContainer.push_back(coord(i, currCoord.row, currCoord.col));
+                     }
+                 }
+            }
+            return false;
+        };
+
+
+
+        void storePath(coord goal)    {
+            //if the previous place is to the __
+ 
+            while(goal != start)   {
+                location cLoc = layout[goal.floor][goal.row][goal.col];
+                switch(cLoc.prev)   {
+                    case 's':
+                        layout[goal.floor][goal.row + 1][goal.col].val = 'n';
+                        ++goal.row;
+                        break;
+                    case 'n':   
+                        layout[goal.floor][goal.row - 1][goal.col].val = 's';
+                        --goal.row;
+                        break;
+                    case 'e':
+                        layout[goal.floor][goal.row][goal.col + 1].val = 'w';
+                        ++goal.col; 
+                        break;
+                    case 'w':
+                        layout[goal.floor][goal.row][goal.col - 1].val = 'e';
+                        --goal.col; 
+                        break;
+                    default:
+                        uint32_t floor1 = static_cast<uint32_t>(cLoc.prev - '0');
+                        char cFloor = static_cast<char>('0' + goal.floor);
+                        layout[floor1][goal.row][goal.col].val = cFloor;
+                        goal.floor = floor1;
+                        break;
+                }
+            }
         }
 
         void outputInstructionsM()  {
-            for (size_t i = 0; i < d.floors; ++i)  {
+            cout << "Start in level " << start.floor 
+            << ", row " << start.row << ", column " << start.col << endl;
+            for (uint32_t i = 0; i < d.floors; ++i)  {
                 cout << "//level " << i << "\n";
-                for (size_t j = 0; j < d.rows; ++j)    {
-                    for (size_t k = 0; k < d.rows; ++k)    {
+                for (uint32_t j = 0; j < d.rows; ++j)    {
+                    for (uint32_t k = 0; k < d.rows; ++k)    {
                         cout << layout[i][j][k].val;
                     }
                     cout << "\n";
@@ -596,35 +508,35 @@ class getFastestRoute   {
         }
         
         void outputInstructionsL()  {
-            location curr = layout[start.floor][start.row][start.col];
-            while (curr.val != 'H')    {
-                cout << "(" << curr.myCoord.floor << "," << curr.myCoord.row << "," 
-                << curr.myCoord.col << "," << curr.val << ")\n";
-                
-                if (curr.val == 'n')    {
-                    curr = layout[curr.myCoord.floor][curr.myCoord.row + 1][curr.myCoord.col];
-                }
-                if (curr.val == 's')    {
-                    curr = layout[curr.myCoord.floor][curr.myCoord.row - 1][curr.myCoord.col];
-                }
-                if (curr.val == 'e')    {
-                    curr = layout[curr.myCoord.floor][curr.myCoord.row][curr.myCoord.col + 1];
-                }
-                if (curr.val == 'w')    {
-                    curr = layout[curr.myCoord.floor][curr.myCoord.row][curr.myCoord.col - 1];
-                }
-                else    {
-                    cerr << curr.val << endl;
-                    int floor = int(curr.val);
-                    size_t sFloor = static_cast<size_t>(floor);
-                    curr = layout[sFloor][curr.myCoord.row][curr.myCoord.col];
+            coord curr = start;
+            while (curr != hangar)    {
+                location cLoc = layout[curr.floor][curr.row][curr.col];
+                cout << "(" << curr.floor << "," << curr.row << "," 
+                << curr.col << "," << cLoc.val << ")\n";
+                switch(cLoc.val){
+                    case 'n':
+                        --curr.row;
+                        break;
+                    case 's':
+                        ++curr.row;
+                        break;
+                    case 'e':
+                        ++curr.col;
+                        break;
+                    case 'w':
+                        --curr.col;
+                        break;
+                    default:
+                        curr.floor = static_cast<uint32_t>(cLoc.val - '0');
+                        break;
                 }
             }
         }
-    
 };
 
 int main(int argc, char * argv[])   {
+    std::ios::sync_with_stdio(false);
+
     getFastestRoute tester;
     tester.getMode(argc, argv);
     tester.takeInData();

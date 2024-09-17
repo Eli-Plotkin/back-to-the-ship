@@ -8,11 +8,11 @@
             "preLaunchTask": "build debug executable",
             "program": "${workspaceFolder}/ship_debug",
             "stdio": [
-                null, // redirect stdin
-                null, // redirect stdout
+                "test-11-sm.txt", // redirect stdin
+                "output.txt", // redirect stdout
                 null // redirect stderr
             ],
-            "args": ["--stack", "< Sample-Small-L.txt", "> output.txt"],
+            "args": ["--stack", "-o", "L"],
             "stopOnEntry": false,
             "cwd": "${workspaceFolder}",
             "postDebugTask": "clean workspace"
